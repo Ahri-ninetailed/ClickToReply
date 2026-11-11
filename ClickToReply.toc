@@ -4,5 +4,6 @@
 ## Notes-ruRU: ЛКМ по тексту сообщения игрока открывает поле ввода в исходном канале с уже набранным "Имя, ".
 ## Author: Ahri-ninetailed
 ## Version: @project-version@
+## X-Curse-Project-ID: 1798024
 
 ClickToReply.lua
