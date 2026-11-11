@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: ClickToReply
+## Notes: Left-click on a player's chat message text opens the edit box in the source channel with "Name, " already typed.
+## Notes-ruRU: ЛКМ по тексту сообщения игрока открывает поле ввода в исходном канале с уже набранным "Имя, ".
+## Author: Ahri-ninetailed
+## Version: @project-version@
+
+ClickToReply.lua

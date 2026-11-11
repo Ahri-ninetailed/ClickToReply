@@ -1,0 +1,28 @@
+# Собирает аддон и выкладывает его на CurseForge и в GitHub Releases.
+# Запускается, когда в репозиторий отправлен тег вида v1.0.1:
+#   git tag v1.0.1
+#   git push origin v1.0.1
+name: Package and release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # нужно, чтобы создать GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # полная история нужна для changelog
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
