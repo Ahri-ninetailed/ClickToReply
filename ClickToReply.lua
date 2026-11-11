@@ -76,8 +76,12 @@ local function Watch(editBox)
     editBox:HookScript("OnTextChanged", function(self, userInput)
         if userInput then Forget(self) end
     end)
-    -- Поле закрыли (отправка, Esc, клик мимо): текст очищается, но на всякий случай забываем и так.
-    editBox:HookScript("OnEditFocusLost", Forget)
+    -- Поле закрыли (отправка, Esc): текст очищается, но на всякий случай забываем и так.
+    -- Потерю фокуса НЕ отслеживаем: клик по другому сообщению в чате снимает фокус с поля, а
+    -- клиент закрывает поле при потере фокуса, только если оно пустое
+    -- (ChatFrameEditBoxMixin:ShouldDeactivateChatOnEditFocusLost). Значит, "Имя, " остаётся в поле,
+    -- и если бы мы его здесь забыли, повторный клик по другому нику ничего бы не менял.
+    -- Текст при потере фокуса не меняется, а свой ввод пользователя ловит OnTextChanged выше.
     editBox:HookScript("OnHide", Forget)
 end
 
