@@ -189,6 +189,7 @@ local function IndexBelongsToLine(line, index, y)
     local lineStart = line:FindCharacterIndexAtCoordinate(left + 1, y)
     if not IsNumber(lineStart) or index < lineStart then return false end
     local nextStart, nextInside = line:FindCharacterIndexAtCoordinate(left + 1, y - height / count)
+    if issecretvalue(nextInside) then return false end -- см. комментарий в LineUnderCursor
     if nextInside and (not IsNumber(nextStart) or index >= nextStart) then return false end
     return true
 end
@@ -203,7 +204,11 @@ local function LineUnderCursor(chatFrame)
     for _, line in ipairs(lines) do
         if line:IsShown() and line.messageInfo then
             local index, inside = line:FindCharacterIndexAtCoordinate(x, y)
-            if index and inside then
+            -- Для строки с секретным текстом (сообщения, пришедшие во время ограничений чата, например
+            -- в бою в подземелье) клиент возвращает секретные значения. Их нельзя даже проверить на
+            -- истинность: "if inside" падает с ошибкой. Такие строки пропускаем: отвечать на них мы всё
+            -- равно не можем, а строка под курсором только одна, так что остальные дадут inside == false.
+            if not issecretvalue(index) and not issecretvalue(inside) and index and inside then
                 if IndexBelongsToLine(line, index, y) then return line, index end
                 return
             end
@@ -217,7 +222,9 @@ local function BuildReply(line, index)
     local extra = info and info.extraData
     if type(extra) ~= "table" then return end
 
-    local chatType = type(extra[EXTRA_EVENT]) == "string" and REPLY_TYPE[extra[EXTRA_EVENT]]
+    local event = extra[EXTRA_EVENT]
+    if issecretvalue(event) then return end
+    local chatType = type(event) == "string" and REPLY_TYPE[event]
     local args = extra[EXTRA_ARGS]
     local message = info.message
     if not chatType or type(args) ~= "table" or type(message) ~= "string" or issecretvalue(message) then return end
