@@ -5,15 +5,10 @@
 -- читает данные, которые клиент сам сохранил вместе со строкой чата, и открывает поле
 -- ввода штатным ChatFrameUtil.OpenChat (так же, как это делают ссылки на каналы).
 --
--- ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ (не забыть!): клик по иконкам и пометкам, которые другие аддоны
--- дописывают ПЕРЕД текстом, отличается от клика по тексту только в одном случае: когда они
--- стоят на отдельной визуальной строке (например, при TwoLineChat: заголовок и иконки на первой
--- строке, текст на второй). Тогда см. IndexBelongsToLine.
--- Если иконки стоят в середине ТОЙ ЖЕ строки, что и текст (одна строка, без TwoLineChat), клиент
--- отдаёт позицию без учёта ширины иконок, и клик по иконке может сработать как клик по тексту.
--- Это в игре не проверялось и индексом символа не лечится. Лечить можно только сравнением клика
--- с положением текста в пикселях (измерять ширину "заголовок + иконки" вспомогательным
--- FontString): это уже архитектурное изменение, делать его только по согласованию с автором.
+-- Попал ли клик в текст, решаем по прямоугольникам, которые занимает на экране сам текст сообщения
+-- (их отдаёт клиент, см. ClickOnText). Время, канал, ник, иконки и пометки, которые аддоны дописывают
+-- перед текстом, в эти прямоугольники не входят, на какой бы визуальной строке они ни стояли.
+-- Где эти прямоугольники неточны, описано у ClickOnText.
 
 local issecretvalue = issecretvalue or function() return false end
 
@@ -223,46 +218,54 @@ local function ResolveChannel(args)
     end
 end
 
--- Клиент выбирает визуальную строку по y, а для x за пределами её текста (например, над иконками
--- в конце строки) отдаёт индекс символа из СЛЕДУЮЩЕЙ строки. Поэтому индекс принимаем, только если
--- он лежит между первым символом строки под курсором и первым символом следующей строки.
--- Первые символы строк узнаём у самого клиента: тот же y у левого края и на строку ниже.
--- Не помогает, если иконки и текст на одной строке (см. "ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ" в начале файла).
-local function IndexBelongsToLine(line, index, y)
-    local left, height, count = line:GetLeft(), line:GetStringHeight(), line:GetNumLines()
-    if not (IsNumber(left) and IsNumber(height) and IsNumber(count) and count > 0) then return false end
-    local lineStart = line:FindCharacterIndexAtCoordinate(left + 1, y)
-    if not IsNumber(lineStart) or index < lineStart then return false end
-    local nextStart, nextInside = line:FindCharacterIndexAtCoordinate(left + 1, y - height / count)
-    if issecretvalue(nextInside) then return false end -- см. комментарий в LineUnderCursor
-    if nextInside and (not IsNumber(nextStart) or index >= nextStart) then return false end
-    return true
-end
-
--- Строка чата под курсором и индекс символа в её тексте (как в выделении текста Blizzard).
-local function LineUnderCursor(chatFrame)
+-- Строка чата (одно сообщение) под курсором: курсор внутри её прямоугольника.
+-- У строки с секретным текстом (сообщения, пришедшие во время ограничений чата, например в бою с
+-- боссом) и у строк, привязанных к ней, координаты могут быть секретными. Сравнивать их нельзя
+-- (ошибка), поэтому такие строки пропускаем: отвечать на них всё равно нельзя.
+local function LineUnderCursor(chatFrame, x, y)
     local lines = chatFrame.visibleLines
     if type(lines) ~= "table" then return end
-    local x, y = GetCursorPosition()
-    local scale = chatFrame:GetEffectiveScale()
-    x, y = x / scale, y / scale
     for _, line in ipairs(lines) do
         if line:IsShown() and line.messageInfo then
-            local index, inside = line:FindCharacterIndexAtCoordinate(x, y)
-            -- Для строки с секретным текстом (сообщения, пришедшие во время ограничений чата, например
-            -- в бою в подземелье) клиент возвращает секретные значения. Их нельзя даже проверить на
-            -- истинность: "if inside" падает с ошибкой. Такие строки пропускаем: отвечать на них мы всё
-            -- равно не можем, а строка под курсором только одна, так что остальные дадут inside == false.
-            if not issecretvalue(index) and not issecretvalue(inside) and index and inside then
-                if IndexBelongsToLine(line, index, y) then return line, index end
-                return
+            local left, right, bottom, top = line:GetLeft(), line:GetRight(), line:GetBottom(), line:GetTop()
+            if IsNumber(left) and IsNumber(right) and IsNumber(bottom) and IsNumber(top)
+                    and x >= left and x <= right and y >= bottom and y <= top then
+                return line
             end
         end
     end
 end
 
+-- Попал ли клик в текст сообщения: байты first..last строки line.
+-- Прямоугольники текста берём у клиента (по ним Blizzard рисует выделение текста в чате): по одному
+-- на каждую визуальную строку, от левого нижнего угла строки чата.
+-- FindCharacterIndexAtCoordinate для этого не годится (проверено в игре, WoW Forever 1.60.1): она не
+-- учитывает отступ строк после первой (у чата включён перенос с отступом) и считает все строки
+-- высотой 16, хотя строка с иконками выше (около 21). Из-за этого клик по короткому тексту под
+-- заголовком (TwoLineChat) попадал "за конец текста" и ничего не происходило.
+-- Прямоугольники отступ учитывают, но тоже считают все строки одной высоты, только отсчитывают их
+-- снизу. Поэтому они точны для строк ниже последней строки с иконками, то есть для текста под
+-- заголовком. Если текст стоит на одной строке с иконками (без TwoLineChat), верхний край этой
+-- строки может не реагировать на клик; в игре это не проверялось.
+local function ClickOnText(line, first, last, x, y)
+    local left, bottom = line:GetLeft(), line:GetBottom()
+    if not (IsNumber(left) and IsNumber(bottom)) then return false end
+    local ok, areas = pcall(line.CalculateScreenAreaFromCharacterSpan, line, first, last + 1)
+    if not ok or type(areas) ~= "table" then return false end
+    x, y = x - left, y - bottom
+    for _, area in ipairs(areas) do
+        local l, b, w, h = area.left, area.bottom, area.width, area.height
+        if IsNumber(l) and IsNumber(b) and IsNumber(w) and IsNumber(h)
+                and x >= l and x <= l + w and y >= b and y <= b + h then
+            return true
+        end
+    end
+    return false
+end
+
 -- Возвращает текст для поля ввода ("/g Имя, ") или nil, если по этому месту отвечать не нужно.
-local function BuildReply(line, index)
+-- x, y - курсор в координатах окна чата.
+local function BuildReply(line, x, y)
     local info = line.messageInfo
     local extra = info and info.extraData
     if type(extra) ~= "table" then return end
@@ -282,7 +285,7 @@ local function BuildReply(line, index)
     if (guid and guid == UnitGUID("player")) or name == UnitName("player") then return end -- свои сообщения
 
     local first, last = BodyRange(message, extra[EXTRA_FORMATTER], args[ARG_TEXT])
-    if not first or index < first or index > last then return end -- время, канал, ник, пустое место
+    if not first or not ClickOnText(line, first, last, x, y) then return end -- время, канал, ник, пустое место
 
     if not CanWriteTo(chatType) then return end
 
@@ -311,9 +314,11 @@ local function OnLeftMouseUp()
 
     local chatFrame = ChatFrameUnderCursor()
     if not chatFrame then return end
-    local line, index = LineUnderCursor(chatFrame)
+    local scale = chatFrame:GetEffectiveScale()
+    x, y = x / scale, y / scale
+    local line = LineUnderCursor(chatFrame, x, y)
     if not line then return end
-    local command, reply, chatType, channelIndex = BuildReply(line, index)
+    local command, reply, chatType, channelIndex = BuildReply(line, x, y)
     if not command then return end
 
     -- Ссылка могла сработать до или после этого события, поэтому решаем на следующем кадре.
