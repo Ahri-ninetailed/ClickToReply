@@ -40,7 +40,8 @@ local REPLY_TYPE = {
 local EXTRA_EVENT, EXTRA_ARGS, EXTRA_FORMATTER = 4, 5, 6
 
 -- Номера аргументов события CHAT_MSG_*.
-local ARG_TEXT, ARG_AUTHOR, ARG_CHANNEL_INDEX, ARG_GUID = 1, 2, 8, 12
+-- ARG_CHANNEL_NAME - имя канала с номером ("1. Общий - Оргриммар"), ARG_CHANNEL_BASE - без номера.
+local ARG_TEXT, ARG_AUTHOR, ARG_CHANNEL_NAME, ARG_CHANNEL_INDEX, ARG_CHANNEL_BASE, ARG_GUID = 1, 2, 4, 8, 9, 12
 
 local MAX_MOVE_SQ = 5 * 5 -- пикселей: больше - это перетаскивание, а не клик
 
@@ -178,6 +179,50 @@ local function IsNumber(value)
     return type(value) == "number" and not issecretvalue(value)
 end
 
+local function IsText(value)
+    return type(value) == "string" and value ~= "" and not issecretvalue(value)
+end
+
+-- Имя канала, который сейчас стоит под этим номером, или nil.
+local function ChannelNameAt(index)
+    local id, name = GetChannelName(index)
+    if IsNumber(id) and id > 0 and IsText(name) then return name end
+end
+
+-- Номер, под которым сейчас стоит канал сообщения, или nil, если нас в этом канале больше нет.
+-- Одного номера из сообщения мало: после смены зоны "1. Общий - Оргриммар" пропадает, номер 1
+-- занимает "Общий - Дуротар", и ответ ушёл бы туда, где автора нет. Поэтому сверяем имя канала.
+-- Имя канала сообщения клиент отдаёт дважды: с номером (его срезаем) и без. Хватает совпадения
+-- с любым из них. Регистр не важен: имена каналов в WoW от регистра не зависят.
+local function ResolveChannel(args)
+    local index, prefixed, base = args[ARG_CHANNEL_INDEX], args[ARG_CHANNEL_NAME], args[ARG_CHANNEL_BASE]
+    if issecretvalue(index) or issecretvalue(prefixed) or issecretvalue(base) then return end
+    local names = {}
+    if IsText(prefixed) then
+        local name = string.gsub(prefixed, "^%d+%.%s*", "")
+        if name ~= "" then names[#names + 1] = name end
+    end
+    if IsText(base) then names[#names + 1] = base end
+
+    local function IsSource(id)
+        local current = ChannelNameAt(id)
+        if not current then return false end
+        current = string.upper(current)
+        for _, name in ipairs(names) do
+            if current == string.upper(name) then return true end
+        end
+        return false
+    end
+
+    -- Обычно канал стоит на прежнем номере.
+    if IsNumber(index) and index > 0 and IsSource(index) then return index end
+    -- Тот же канал мог получить другой номер (вышли и зашли снова): ищем по имени и перепроверяем.
+    for _, name in ipairs(names) do
+        local id = GetChannelName(name)
+        if IsNumber(id) and id > 0 and IsSource(id) then return id end
+    end
+end
+
 -- Клиент выбирает визуальную строку по y, а для x за пределами её текста (например, над иконками
 -- в конце строки) отдаёт индекс символа из СЛЕДУЮЩЕЙ строки. Поэтому индекс принимаем, только если
 -- он лежит между первым символом строки под курсором и первым символом следующей строки.
@@ -229,8 +274,8 @@ local function BuildReply(line, index)
     local message = info.message
     if not chatType or type(args) ~= "table" or type(message) ~= "string" or issecretvalue(message) then return end
 
-    local author, guid, channelIndex = args[ARG_AUTHOR], args[ARG_GUID], args[ARG_CHANNEL_INDEX]
-    if issecretvalue(author) or issecretvalue(guid) or issecretvalue(channelIndex) then return end
+    local author, guid = args[ARG_AUTHOR], args[ARG_GUID]
+    if issecretvalue(author) or issecretvalue(guid) then return end
     if type(author) ~= "string" or author == "" then return end
 
     local name = Ambiguate(author, "none")
@@ -241,9 +286,10 @@ local function BuildReply(line, index)
 
     if not CanWriteTo(chatType) then return end
 
-    local slash
+    local slash, channelIndex
     if chatType == "CHANNEL" then
-        if type(channelIndex) ~= "number" or channelIndex <= 0 or GetChannelName(channelIndex) == 0 then return end
+        channelIndex = ResolveChannel(args)
+        if not channelIndex then return end
         slash = "/" .. channelIndex
     else
         slash = _G["SLASH_" .. chatType .. "1"]

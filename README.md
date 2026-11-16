@@ -10,8 +10,9 @@
 - **Changed your mind? Just click another message.** While you haven't typed anything yourself, a click on another player's message replaces the name (and the channel) with the new one. Click as many times as you like until you pick the right person.
 - **Never touches your text.** Once you have typed something of your own, the addon leaves the input alone: your text, channel and cursor stay as they are.
 - **Normal chat clicks keep working.** Clicks on the timestamp, channel name, player name and links (items, quests, players, channels) behave as usual. Shift, Ctrl or Alt + click, dragging the chat window and clicks on the scroll bar or buttons are ignored.
-- **No messages to the wrong place.** If you can no longer write to that channel (you left the group, raid, guild or channel), nothing happens.
+- **No messages to the wrong place.** If you can no longer write to that channel (you left the group, raid, guild or channel, for example Trade when you enter a dungeon), nothing happens. Numbered channels are matched by name, so after a zone change a reply to an old General message never ends up in the new zone's General.
 - Your own messages, whispers, emotes, system, loot and other non-chat messages are ignored.
+- **Boss fights.** While the game restricts chat for addons (for example, during a boss fight), it hides messages from them. Clicks do nothing then, and messages that arrived during the fight can't be answered by a click even after it.
 - Players from other realms are addressed as `Name-Realm`.
 - Works together with addons that add icons in front of the message text, such as TwoLineChat.
 - **Lightweight and safe.** No chat filters, chat messages are not modified, no Blizzard functions are overridden.
@@ -45,8 +46,9 @@ Source code and bug reports: [GitHub](https://github.com/Ahri-ninetailed/ClickTo
 - **Передумал? Просто кликни по другому сообщению.** Пока вы сами ничего не написали, клик по сообщению другого игрока заменяет ник (и канал) на новый. Можно кликать сколько угодно, пока не выберете нужного человека.
 - **Ваш текст не трогает.** Как только вы начали писать что-то своё, аддон поле ввода не трогает: текст, канал и курсор остаются как есть.
 - **Обычные клики по чату работают как раньше.** Клики по времени, названию канала, нику и ссылкам (предметы, задания, игроки, каналы) работают как обычно. Клики с Shift, Ctrl или Alt, перетаскивание окна чата и клики по полосе прокрутки и кнопкам игнорируются.
-- **Никаких сообщений не туда.** Если писать в этот канал уже нельзя (вы вышли из группы, рейда, гильдии или канала), ничего не происходит.
+- **Никаких сообщений не туда.** Если писать в этот канал уже нельзя (вы вышли из группы, рейда, гильдии или канала, например из «Торговли» при входе в подземелье), ничего не происходит. Номерные каналы сверяются по названию: после смены зоны ответ на старое сообщение из «Общего» не уйдёт в «Общий» новой зоны.
 - Свои сообщения, шёпот, эмоции, системные сообщения, добыча и прочее игнорируются.
+- **Бои с боссами.** Пока игра ограничивает чат для аддонов (например, в бою с боссом), она скрывает от них сообщения. Клики в это время ничего не делают, а на сообщения, пришедшие во время боя, кликом не ответить и после него.
 - К игрокам с других серверов аддон обращается как `Имя-Сервер`.
 - Работает вместе с аддонами, которые добавляют иконки перед текстом сообщения, например TwoLineChat.
 - **Лёгкий и безопасный.** Не фильтрует чат, не меняет сообщения и не переопределяет функции Blizzard.
